@@ -1,0 +1,258 @@
+####loading libraries####
+library(ggrepel)
+library(dplyr)
+library(ggplot2)
+library(waffle)
+library(lfe)
+library(stargazer)
+library(readxl)
+library(stringi)
+library(boot)
+library(readxl)
+setwd("E:/Extracted Files Dec. 13th")
+##Enter Semesters desired below##
+semesterspull <- c("Summer Semester 2018", "Spring Semester 2018",
+                   "Fall Semester 2017", "Summer Semester 2017", "Spring Semester 2017",
+                   "Fall Semester 2016", "Summer Semester 2016", "Spring Semester 2016",
+                   "Fall Semester 2015", "Summer Semester 2015")
+dfw <- read_excel("DFW.xlsx")
+dfw$course_name <- paste0(dfw$Course,"-", dfw$Section)
+dfw$course_name <- gsub(" ", "-", dfw$course_name)
+dfw$Semester <- gsub(" ", " Semester ", dfw$Semester)
+dfw <- dfw[,c(7,4,6)]
+colnames(dfw)[[2]] <- "name"
+colnames(dfw)[[3]] <- "dfw"
+cwd <- getwd()
+currentdate <- Sys.Date()
+####IDEA Means####
+##load idea course survey means##
+ideameans <- read_excel("IDEA Means.xlsx")
+ideameans$Course <- tolower(ideameans$Course)
+ideameansonline <- ideameans[grep("-[30-39][i]|[70-79][i]", ideameans$Course),]
+ideameansonline <- ideameansonline[!is.na(ideameansonline$`Adj Mean`),]
+
+ideameansonline$Term <- gsub(" ", " Semester ", ideameansonline$Term)                                                                       
+colnames(ideameansonline) <- c("name", "code", "adjavg")
+####Finished w/ Idea Means####
+
+####Loading Data####
+##converasation data##
+disc_entry1 <- read.delim(gzfile("disc_entry1"), quote = "", sep = "\t",
+                          header = FALSE, stringsAsFactors = FALSE)[,c(3,5,6)]
+disc_entry2 <- read.delim(gzfile("disc_entry2"), quote = "", sep = "\t",
+                          header = FALSE, stringsAsFactors = FALSE)[,c(3,5,6)]
+disc_entry_full <- rbind(disc_entry1, disc_entry2)
+
+disc_topic1 <- read.delim(gzfile("disc_topic1"), quote = "", sep = "\t",
+                          header = FALSE, stringsAsFactors = FALSE)[,c(2,3,5)]
+conv_msg_part <- read.delim(gzfile("conv_msg_part1"), quote = "",sep = "\t",
+                          header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+conv_msg_part2 <- read.delim(gzfile("conv_msg_part2"), quote = "",sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+conv_msg_part3 <- read.delim(gzfile("conv_msg_part3"), quote = "",sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+conv_msg_part4 <- read.delim(gzfile("conv_msg_part4"),quote = "", sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+conv_msg_part5 <- read.delim(gzfile("conv_msg_part5"), quote = "",sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+conv_msg_part6 <- read.delim(gzfile("conv_msg_part6"),quote = "", sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,4)]
+
+conv_msg_part_full <- rbind(conv_msg_part, conv_msg_part2, conv_msg_part3,
+                            conv_msg_part4, conv_msg_part5, conv_msg_part6)
+
+conv_dim <- read.delim(gzfile("conv_dim"), sep = "\t",quote = "", header = FALSE, 
+                     stringsAsFactors = FALSE)[,c(1,6)]
+
+convmessagedim <- read.delim(gzfile("conv_msg_dim1"), quote = "",sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,3,4,5:9)] 
+convmessagedim2 <- read.delim(gzfile("conv_msg_dim2"),quote = "", sep = "\t",
+                            header = FALSE, stringsAsFactors = FALSE)[,c(1,3,4,5:9)] 
+convmessagedim3 <- read.delim(gzfile("conv_msg_dim3"), quote = "",sep = "\t",
+                            header = FALSE, stringsAsFactors = FALSE)[,c(1,3,4,5:9)]
+
+convmsgdim_full <- rbind(convmessagedim, convmessagedim2, convmessagedim3)
+
+##submission comment data##
+sub_comm_fact1 <- read.delim(gzfile("sub_comm_fact1"),quote = "", sep = "\t", header = FALSE,
+                           stringsAsFactors = FALSE)[,c(1,4,6)]
+sub_comm_fact2 <- read.delim(gzfile("sub_comm_fact2"),quote = "", sep = "\t", header = FALSE,
+                           stringsAsFactors = FALSE)[,c(1,4,6)]
+sub_comm_fact_full <- rbind(sub_comm_fact1, sub_comm_fact2)
+
+sub_comm_dim1 <-  read.delim(gzfile("sub_comm_dim1"),quote = "", sep = "\t", header = FALSE,
+                           stringsAsFactors = FALSE)[,c(1,8:11)]
+sub_comm_dim2 <-  read.delim(gzfile("sub_comm_dim2"),quote = "", sep = "\t", header = FALSE,
+                           stringsAsFactors = FALSE)[,c(1,8:11)]
+sub_comm_dim_full <- rbind(sub_comm_dim1, sub_comm_dim2)
+
+##enrollment and user data##
+enrollment_term <- read.delim(gzfile("enrollment_term_dim"),quote = "", sep = "\t", header = FALSE,
+                            stringsAsFactors = FALSE)[,c(1,4)]
+enrollment <- read.delim(gzfile("enrollment_dim"),quote = "", sep = "\t", header = FALSE,
+                       stringsAsFactors = FALSE)[,c(6,15,16)]
+courses <- read.delim(gzfile("course_dim"), sep = "\t",quote = "", header = FALSE,
+                    stringsAsFactors = FALSE)[,c(1,4,5:7)]
+user <- read.delim(gzfile("user_dim"), sep = "\t",quote = "",
+                 header = FALSE, stringsAsFactors = FALSE)[,c(1,16)]
+account <- read.delim(gzfile("account_dim"), sep = "\t",quote = "",
+                    header = FALSE, stringsAsFactors = FALSE)[,c(1,3,6)]
+
+####finished loading data####
+
+####set column names####
+colnames(disc_entry_full) <- c("user_id", "course_id", "enrollment_term_id")
+colnames(disc_topic1) <- c("course_id", "enrollment_term_id", "user_id")
+colnames(conv_dim) <- c("conversation_id", "course_id")
+colnames(user) <- c("user_id", "sortable_name")
+colnames(account) <-  c("account_id", "account_name", "parent_account")
+
+colnames(sub_comm_fact_full) <- c("submission_comment_id","user_id","course_id")
+
+colnames(sub_comm_dim_full) <- c("submission_comment_id", "comment", 
+                                 "author_name", "created_at", "updated_at")
+
+colnames(convmsgdim_full) <- c("conversation_message_id","conversation_id", "user_id",
+                               "created_at", "sys.gen", "has_attachments",
+                               "has_media_objects", "body")
+colnames(conv_msg_part_full) <- c("conversation_message_id", "course_id")
+
+
+colnames(courses) <- c("course_id", "account_id",
+                       "enrollment_term_id","course_name", "code")
+colnames(enrollment_term) <- c("enrollment_term_id", "name")
+colnames(enrollment) <- c("type", "course_id", "user_id")
+
+####finished column naming####
+
+####Merge####
+##enrollments for last 6 complete semesters##
+enrollment_term <- enrollment_term[enrollment_term$name %in% semesterspull,]
+ideameansonline <- merge(ideameansonline, enrollment_term, by = "name")
+disc_entry_full <- merge(disc_entry_full, enrollment_term, by = "enrollment_term_id")
+
+teacheronly <- enrollment[enrollment$type == "TeacherEnrollment",]
+teacheronly <- teacheronly %>%
+  group_by(course_id, user_id) %>%
+  mutate(numteacher = n())
+
+students <- enrollment %>%
+  group_by(type, course_id) %>%
+  summarise(count = n())
+
+studentenrollment <- students[students$type == "StudentEnrollment",]
+##obtain teacher name##
+teacherenrollment <- merge(teacheronly, user, by = "user_id")
+##merge courses and sub and conv frames##
+courses_new <- merge(courses, enrollment_term, by = "enrollment_term_id")
+courses_new <- merge(courses_new, account, by = "account_id")
+
+subframe <- merge(sub_comm_fact_full, sub_comm_dim_full, 
+                  by = "submission_comment_id")
+
+subframe <- merge(subframe, courses_new, by = "course_id")
+studentsub <- subframe[!subframe$user_id %in% teacherenrollment$user_id,]
+subframe <- subframe[subframe$user_id %in% teacherenrollment$user_id,]
+
+convframe <- merge(convmsgdim_full, conv_msg_part_full, by = "conversation_message_id")
+convframe <- merge(convframe, courses_new, by = "course_id")
+studentconv <- convframe[!convframe$user_id %in% teacherenrollment$user_id,]
+convframe <- convframe[convframe$user_id %in% teacherenrollment$user_id,]
+
+teacher_disc_start <- disc_topic1[disc_topic1$user_id %in% teacherenrollment$user_id,]
+teacher_disc_entry <- disc_entry_full[disc_entry_full$user_id %in% teacherenrollment$user_id,]
+####Finished merging####
+
+courses_new <- merge(courses_new, dfw, by = c("course_name", "name"))
+
+
+
+####Total Interaction Counting####
+##summing interactions##
+subframetotal <- subframe %>%
+  group_by(course_id) %>%
+  summarise(subcount = n())
+
+convframetotal <- convframe %>%
+  group_by(course_id) %>%
+  summarise(convcount = n())
+
+teacher_disc_entry <- teacher_disc_entry %>%
+  group_by(course_id) %>%
+  summarize(disc_count = n())
+
+teacher_disc_start <- teacher_disc_start %>%
+  group_by(course_id) %>%
+  summarize(disc_start = n())
+####.####
+totals <- merge(convframetotal, subframetotal, all = TRUE)
+totals <- merge(totals, teacher_disc_entry, all = TRUE)
+totals <- merge(totals, teacher_disc_start, all = TRUE)
+totals[is.na(totals)] <- 0
+
+totals <- merge(totals, courses_new, by = "course_id")
+totals$code <- tolower(totals$code)
+totals$course_name <- tolower(totals$course_name)
+
+totals <- totals[with(totals, grepl("-[30-39][i]|[70-79][i]",
+                                    paste(course_name, code))),]
+
+totals <- merge(totals, studentenrollment, by = "course_id")
+totals$intcount <- totals$convcount + totals$subcount + totals$disc_count + totals$disc_start
+totals$intperstudent <- round(totals$intcount / totals$count,2)
+totals$code <- gsub("\\/.*", "", totals$code)
+totals$account_name <- gsub("\\/.*", "", totals$account_name)
+####.####
+colnames(totals)[[6]] <- "code"
+totals <- totals[,-10]
+totals <- merge(totals, ideameansonline, by = c("name", "code"))
+
+
+
+
+finalfinal <- totals
+finalfinal$level <- stri_extract_first_regex(finalfinal$code, "[0-9]+")
+finalfinal$level <- substring(finalfinal$level, 1, 1)
+finalfinal$level <- paste0(finalfinal$level, "000")
+deptlist <- unique(finalfinal$account_name)
+levellist <- unique(finalfinal$level)
+quantiledf <- NULL
+for (i in 1:length(deptlist)) {
+  df <- finalfinal[finalfinal$account_name == deptlist[i],]
+  account_name <- deptlist[i]
+  for (i in 1:length(levellist)) {
+    df2 <- df[df$level == levellist[i],]
+    df5 <- df2
+    df2 <- df2[df2$adjavg > 3.5,]
+    if(nrow(df2) > 0){
+    quant <- round(quantile(df2$intperstudent, probs = .75),2)
+    df3 <- df2[df2$intperstudent >= quant,]
+    df4 <- df5[df5$intperstudent < quant,]
+    quant3 <- round(mean(df4$dfw),2)
+    quant2 <- round(mean(df3$dfw),2)
+    level <- levellist[i]
+    boot1 <- boot(df2$intperstudent, function(x, index){quantile(x[index],.75)},R = 1000)
+    se <- round(sd(boot1$t),2)
+    quantiledf <- rbind(quantiledf, data.frame(account_name,level, quant, se, quant2, quant3))
+    }
+ }
+}
+quantiledf <- quantiledf[complete.cases(quantiledf),]
+quantiledf$quant3 <- ifelse(quantiledf$quant3 == "NaN", 0, quantiledf$quant3)
+colnames(quantiledf) <- c("Department", "Course Level", "Recommended Interactions", "Standard Error", "DFW Rates", "DFW Non Top 25")
+write.csv(quantiledf, "Optimal Interaction.csv", row.names =F)
+finalfinal$interactions2 <- finalfinal$convcount + finalfinal$subcount
+finalfinal$intper2 <- round(finalfinal$interactions2 / finalfinal$count,2)
+jpeg("OnlineDFW.jpeg")
+ggplot(data = finalfinal, aes(x = intperstudent, y = dfw)) + geom_point(shape = 19, size = 2, color = 'dark grey') + labs(x = "Interactions Per Student", y = "Drop, Fail or Withdrawal Rates", title = "Online Interactions with DFW Rates")
+dev.off()
+
+
+final2 <- finalfinal[ , ]
+ggplot(data = finalfinal, aes(intperstudent, dfw)) + geom_point(shape = 19, size = 2, 
+                                                                color = ifelse(finalfinal$intperstudent <= 5, "red",
+                                                                               ifelse(finalfinal$intperstudent <= 15, 'black', 'green'))) + 
+  labs(x = "Interactions Per Student", y = "DFW Rates", title = "Online Interactions + DFW Rates")+ xlim(0,50) + ylim(.01, .65)
+
+
+
