@@ -1,0 +1,122 @@
+####Libraries####
+library(dplyr)
+library(readr)
+library(readxl)
+library(ggplot2)
+setwd("E:/Extracted Files Dec. 13th")
+####Loading Data###
+semesterspull <- c("Fall Semester 2018", "Summer Semester 2018", "Spring Semester 2018")
+cwd <- getwd()
+currentdate <- Sys.Date()
+####Loading Data####
+sub_dim1 <- read.delim(gzfile("sub_dim1"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim2 <- read.delim(gzfile("sub_dim2"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim3 <- read.delim(gzfile("sub_dim3"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim4 <- read.delim(gzfile("sub_dim4"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim5 <- read.delim(gzfile("sub_dim5"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim6 <- read.delim(gzfile("sub_dim6"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim7 <- read.delim(gzfile("sub_dim7"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim8 <- read.delim(gzfile("sub_dim8"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim9 <- read.delim(gzfile("sub_dim9"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim10 <- read.delim(gzfile("sub_dim10"), sep = "\t",quote = "", header = FALSE,
+                      stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim11 <- read.delim(gzfile("sub_dim11"), sep = "\t",quote = "", header = FALSE,
+                      stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim12 <- read.delim(gzfile("sub_dim12"), sep = "\t", header = FALSE,
+                      stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim13 <-read.delim(gzfile("sub_dim13"), sep = "\t",quote = "", header = FALSE,
+                     stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim14 <- read.delim(gzfile("sub_dim14"), sep = "\t",quote = "", header = FALSE,
+         stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+sub_dim15 <- read.delim(gzfile("sub_dim15"), sep = "\t",quote = "", header = FALSE,
+                      stringsAsFactors = FALSE)[,c(6,15,19,22,26)]
+
+sub_dim_full <- rbind(sub_dim1,sub_dim2, sub_dim3, sub_dim4, sub_dim5, sub_dim6,
+                      sub_dim7, sub_dim8, sub_dim9, sub_dim10, sub_dim11, sub_dim12,
+                      sub_dim13, sub_dim14, sub_dim15)
+enrollment_term <- read.delim(gzfile("enrollment_term_dim"),quote = "", sep = "\t", header = FALSE,
+                            stringsAsFactors = FALSE)[,c(1,4)]
+enrollment <- read.delim(gzfile("enrollment_dim"),quote = "", sep = "\t", header = FALSE,
+                       stringsAsFactors = FALSE)[,c(6,15,16)]
+courses <- read.delim(gzfile("course_dim"),quote = "", sep = "\t", header = FALSE,
+                    stringsAsFactors = FALSE)[,c(1,4,5:7)]
+user <- read.delim(gzfile("user_dim"),quote = "", sep = "\t",
+                 header = FALSE, stringsAsFactors = FALSE)[,c(1,16)]
+account <- read.delim(gzfile("account_dim"),quote = "", sep = "\t",
+                    header = FALSE, stringsAsFactors = FALSE)[,c(1,3,6)]
+assignment_dim <- read.delim(gzfile("assignment_dim"),quote = "", sep = "\t",
+                           header = FALSE, stringsAsFactors = FALSE)[,c(1,3,6,11)]
+####Finished Loading####
+
+####Column Naming####
+colnames(courses) <- c("course_id", "account_id",
+                       "enrollment_term_id","course_name", "code")
+colnames(enrollment_term) <- c("enrollment_term_id", "name")
+colnames(enrollment) <- c("type", "course_id", "user_id")
+colnames(user) <- c("user_id", "sortable_name")
+colnames(account) <-  c("account_id", "account_name", "parent_account")
+colnames(assignment_dim) <- c("assignment_id", "course_id", "due_date", "submission_type")
+colnames(sub_dim_full) <- c("submitted_at", "graded_at", "assignment_id", "user_id", "grade_state")
+####Finished Column Naming####
+enrollment_term <- enrollment_term[enrollment_term$name %in% semesterspull,]
+courses_new <- merge(courses, enrollment_term, by = "enrollment_term_id")
+courses_new <- merge(courses_new, account, by = "account_id")
+
+sub_full <- merge(sub_dim_full, assignment_dim, by = "assignment_id")
+submissions <- merge(sub_full, courses_new, by = "course_id")
+submissions <- submissions[submissions$grade_state != "not_graded",]
+
+submissions$gradetime <- ifelse(as.POSIXct(submissions$graded_at, format = "%Y-%m-%d %H:%M:%OS") < as.POSIXct(submissions$submitted_at, format = "%Y-%m-%d %H:%M:%OS"), 0, round(difftime(as.POSIXct(submissions$graded_at, format = "%Y-%m-%d %H:%M:%OS"), as.POSIXct(submissions$submitted_at, format = "%Y-%m-%d %H:%M:%OS"), tz = "UTC", units = "days"),2))
+submissions <- submissions[!is.na(submissions$gradetime),]
+submissions <- submissions[submissions$grade_state != "auto_graded",]
+
+final <- submissions %>%
+  group_by(course_id, course_name, account_name, parent_account, name) %>%
+  summarise(`Average Grade Time` = as.numeric(round(mean(gradetime), 2)),
+            `Assignments` = n())
+final$account_name <- gsub("/", " ", final$account_name)
+
+pdf("Average Overall Grading Time.pdf")
+ggplot() + geom_histogram(data = final, aes(x = `Average Grade Time`),binwidth = 5, bins = 90, fill = 'red') + 
+  labs(x = "Average Grading Time in Days", y = "Frequency", title = "Average Grading Time (After Submission)") + scale_x_continuous(breaks = seq(0, 110, 5))
+dev.off()
+
+dept_list <- unique(final$account_name)
+col_list <- unique(final$parent_account)
+dir.create(file.path(paste0(cwd, "/Department Grading Response Time")))
+setwd(file.path(paste0(cwd, "/Department Grading Response Time")))
+for (i in 1:length(dept_list)) {
+  name <- dept_list[i]
+  df <- final[final$account_name == dept_list[i],]
+  df <- df[order(-df$`Average Grade Time`),]
+  newdir <- name
+  write.csv(df, paste0(name, " Grading Response.csv"), row.names = FALSE)
+  pdf(paste0(name, " Grading Response.pdf"))
+  print(ggplot() + geom_histogram(data = df, aes(x = `Average Grade Time`),binwidth = 1, fill = 'red') + 
+    labs(x = "Average Grading Time in Days", y = "Frequency", title = paste0(name, " Average Grading Time (After Submission)")))
+  dev.off()
+  }
+setwd(cwd)
+dir.create(file.path(paste0(cwd, "/College Grading Response Time")))
+setwd(file.path(paste0(cwd, "/College Grading Response Time")))
+for (i in 1:length(col_list)) {
+  name <- col_list[i]
+  df <- final[final$parent_account == col_list[i],]
+  df <- df[order(-df$`Average Grade Time`),]
+  newdir <- name
+  write.csv(df, paste0(name, " Grading Response.csv"), row.names = FALSE)
+  pdf(paste0(name, " Grading Response.pdf"))
+  print(ggplot() + geom_histogram(data = df, aes(x = `Average Grade Time`),binwidth = 1, fill = 'red') + 
+          labs(x = "Average Grading Time in Days", y = "Frequency", title = paste0(name, " Average Grading Time (After Submission)")))
+  dev.off()
+  }
+setwd(cwd)
